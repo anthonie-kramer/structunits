@@ -1,6 +1,5 @@
 from enum import Enum, auto
 
-
 class UnitType(Enum):
     """Enum that contains all of the pre-defined unit types."""
     AREA = auto()

@@ -1,157 +1,211 @@
+from __future__ import annotations
+
+from typing import ClassVar, Final
 from structunits.unit_type import UnitType
 
 
 class FLT:
-    """Force-Length-Time class to represent physical dimensions"""
+    """
+    Force-Length-Time exponents describing physical dimensions.
+
+    The tuple (F, L, T) means:
+      F = exponent of Force
+      L = exponent of Length
+      T = exponent of Time
+
+    Examples
+    --------
+    >>> FORCE == FLT(1, 0, 0)
+    True
+    >>> (MOMENT / LENGTH) == FORCE
+    True
+    """
+
+    # ClassVar annotations let IDEs/linters know these are static attributes.
+    AREA: ClassVar["FLT"]
+    DENSITY: ClassVar["FLT"]
+    FORCE: ClassVar["FLT"]
+    FORCE_PER_LENGTH: ClassVar["FLT"]
+    FLEXURAL_STIFFNESS: ClassVar["FLT"]
+    LENGTH: ClassVar["FLT"]
+    LENGTH_CUBED: ClassVar["FLT"]
+    LENGTH_TO_THE_4TH: ClassVar["FLT"]
+    LENGTH_TO_THE_6TH: ClassVar["FLT"]
+    MOMENT: ClassVar["FLT"]
+    STRESS: ClassVar["FLT"]
+    TIME: ClassVar["FLT"]
+    UNITLESS: ClassVar["FLT"]
+    ACCELERATION: ClassVar["FLT"]
 
     def __init__(self, force_degree: int, length_degree: int, time_degree: int):
-        self.force_degree = force_degree
-        self.length_degree = length_degree
-        self.time_degree = time_degree
+        self.force_degree = int(force_degree)
+        self.length_degree = int(length_degree)
+        self.time_degree = int(time_degree)
 
+    # ---------- Classification ----------
     def get_type(self) -> UnitType:
-        """Get the UnitType corresponding to this FLT"""
-        # Check if this FLT matches any predefined ones
-        if self == FLT.AREA:
+        """Map this FLT to a higher-level UnitType (used by factories)."""
+        if self == AREA:
             return UnitType.AREA
-        elif self == FLT.DENSITY:
+        if self == DENSITY:
             return UnitType.DENSITY
-        elif self == FLT.FORCE:
+        if self == FORCE:
             return UnitType.FORCE
-        elif self == FLT.FORCE_PER_LENGTH:
+        if self == FORCE_PER_LENGTH:
             return UnitType.FORCE_PER_LENGTH
-        elif self == FLT.FLEXURAL_STIFFNESS:
+        if self == FLEXURAL_STIFFNESS:
             return UnitType.FLEXURAL_STIFFNESS
-        elif self == FLT.LENGTH:
+        if self == LENGTH:
             return UnitType.LENGTH
-        elif self == FLT.LENGTH_CUBED:
+        if self == LENGTH_CUBED:
             return UnitType.LENGTH_CUBED
-        elif self == FLT.LENGTH_TO_THE_4TH:
+        if self == LENGTH_TO_THE_4TH:
             return UnitType.LENGTH_TO_THE_4TH
-        elif self == FLT.LENGTH_TO_THE_6TH:
+        if self == LENGTH_TO_THE_6TH:
             return UnitType.LENGTH_TO_THE_6TH
-        elif self == FLT.MOMENT:
+        if self == MOMENT:
             return UnitType.MOMENT
-        elif self == FLT.STRESS:
+        if self == STRESS:
             return UnitType.STRESS
-        elif self == FLT.TIME:
+        if self == TIME:
             return UnitType.TIME
-        elif self == FLT.UNITLESS:
+        if self == UNITLESS:
             return UnitType.UNITLESS
-        elif self == FLT.ACCELERATION:
+        if self == ACCELERATION:
             return UnitType.ACCELERATION
-        else:
-            return UnitType.UNDEFINED
+        return UnitType.UNDEFINED
 
-    def __eq__(self, other):
-        if not isinstance(other, FLT):
-            return False
-        return (self.force_degree == other.force_degree and
-                self.length_degree == other.length_degree and
-                self.time_degree == other.time_degree)
+    # ---------- Equality / hashing ----------
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, FLT)
+            and self.force_degree == other.force_degree
+            and self.length_degree == other.length_degree
+            and self.time_degree == other.time_degree
+        )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.force_degree, self.length_degree, self.time_degree))
 
-    def __add__(self, other):
-        """Add two FLT instances (combine units)"""
+    # ---------- Algebra on exponents ----------
+    def __add__(self, other: "FLT") -> "FLT":
         if not isinstance(other, FLT):
-            return NotImplemented
-        F = self.force_degree + other.force_degree
-        L = self.length_degree + other.length_degree
-        T = self.time_degree + other.time_degree
-        return FLT(F, L, T)
+            return NotImplemented  # type: ignore[return-value]
+        return FLT(
+            self.force_degree + other.force_degree,
+            self.length_degree + other.length_degree,
+            self.time_degree + other.time_degree,
+        )
 
-    def __sub__(self, other):
-        """Subtract two FLT instances"""
+    def __sub__(self, other: "FLT") -> "FLT":
         if not isinstance(other, FLT):
-            return NotImplemented
-        F = self.force_degree - other.force_degree
-        L = self.length_degree - other.length_degree
-        T = self.time_degree - other.time_degree
-        return FLT(F, L, T)
+            return NotImplemented  # type: ignore[return-value]
+        return FLT(
+            self.force_degree - other.force_degree,
+            self.length_degree - other.length_degree,
+            self.time_degree - other.time_degree,
+        )
 
-    def __neg__(self):
-        """Negate an FLT instance"""
+    def __neg__(self) -> "FLT":
         return FLT(-self.force_degree, -self.length_degree, -self.time_degree)
 
-    def __mul__(self, other):
-        """Multiply an FLT by an integer"""
+    def __mul__(self, other: int | float) -> "FLT":
         if not isinstance(other, (int, float)):
-            return NotImplemented
+            return NotImplemented  # type: ignore[return-value]
         F = self.force_degree * other
         L = self.length_degree * other
         T = self.time_degree * other
-        # Ensure the multiplication by a float results in integers
+
+        # If multiplied by a float, allow near-integers; otherwise return UNITLESS
+        def _snap(x: float) -> int | float:
+            r = round(x)
+            return r if abs(x - r) < 1e-10 else x
+
         if isinstance(other, float):
-            F = round(F) if abs(F - round(F)) < 1e-10 else F
-            L = round(L) if abs(L - round(L)) < 1e-10 else L
-            T = round(T) if abs(T - round(T)) < 1e-10 else T
-            # If they're not integers, return unitless
-            if not (isinstance(F, int) and isinstance(L, int) and isinstance(T, int)):
-                return FLT.UNITLESS
+            F = _snap(F)
+            L = _snap(L)
+            T = _snap(T)
+            if not all(isinstance(x, int) for x in (F, L, T)):
+                return UNITLESS  # fractional exponents → dimensionless result by convention
+
         return FLT(int(F), int(L), int(T))
 
-    def __rmul__(self, other):
-        """Right multiplication"""
+    def __rmul__(self, other: int | float) -> "FLT":
         return self.__mul__(other)
 
-    def __truediv__(self, other):
-        """Divide an FLT by a number"""
+    def __truediv__(self, other: int | float) -> "FLT":
         if not isinstance(other, (int, float)):
-            return NotImplemented
-
+            return NotImplemented  # type: ignore[return-value]
         F = self.force_degree / other
         L = self.length_degree / other
         T = self.time_degree / other
-
-        # Check if the division results in integers
-        if (abs(F - round(F)) < 1e-10 and
-                abs(L - round(L)) < 1e-10 and
-                abs(T - round(T)) < 1e-10):
+        if all(abs(x - round(x)) < 1e-10 for x in (F, L, T)):
             return FLT(int(round(F)), int(round(L)), int(round(T)))
-        else:
-            return FLT.UNITLESS
+        return UNITLESS
 
-    def __str__(self):
-        components = []
+    # ---------- Display ----------
+    def __str__(self) -> str:
+        parts: list[str] = []
+        if self.force_degree:
+            parts.append("F" if self.force_degree == 1 else f"F^{self.force_degree}")
+        if self.length_degree:
+            parts.append("L" if self.length_degree == 1 else f"L^{self.length_degree}")
+        if self.time_degree:
+            parts.append("T" if self.time_degree == 1 else f"T^{self.time_degree}")
+        return "·".join(parts) if parts else "1"
 
-        if self.force_degree != 0:
-            if self.force_degree == 1:
-                components.append("F")
-            else:
-                components.append(f"F^{self.force_degree}")
-
-        if self.length_degree != 0:
-            if self.length_degree == 1:
-                components.append("L")
-            else:
-                components.append(f"L^{self.length_degree}")
-
-        if self.time_degree != 0:
-            if self.time_degree == 1:
-                components.append("T")
-            else:
-                components.append(f"T^{self.time_degree}")
-
-        if not components:
-            return "1"
-        else:
-            return "·".join(components)
+    def __repr__(self) -> str:
+        return f"FLT({self.force_degree}, {self.length_degree}, {self.time_degree})"
 
 
-# Static FLT instances
-FLT.AREA = FLT(0, 2, 0)
-FLT.DENSITY = FLT(1, -3, 0)
-FLT.FORCE = FLT(1, 0, 0)
-FLT.FORCE_PER_LENGTH = FLT(1, -1, 0)
-FLT.FLEXURAL_STIFFNESS = FLT(1, 2, 0)
-FLT.LENGTH = FLT(0, 1, 0)
-FLT.LENGTH_CUBED = FLT(0, 3, 0)
-FLT.LENGTH_TO_THE_4TH = FLT(0, 4, 0)
-FLT.LENGTH_TO_THE_6TH = FLT(0, 6, 0)
-FLT.MOMENT = FLT(1, 1, 0)
-FLT.STRESS = FLT(1, -2, 0)
-FLT.TIME = FLT(0, 0, 1)
-FLT.UNITLESS = FLT(0, 0, 0)
-FLT.ACCELERATION = FLT(0, 1, -2)
+# ----- Module-level singletons (preferred import path) -----
+AREA: Final[FLT] = FLT(0, 2, 0)
+DENSITY: Final[FLT] = FLT(1, -3, 0)
+FORCE: Final[FLT] = FLT(1, 0, 0)
+FORCE_PER_LENGTH: Final[FLT] = FLT(1, -1, 0)
+FLEXURAL_STIFFNESS: Final[FLT] = FLT(1, 2, 0)
+LENGTH: Final[FLT] = FLT(0, 1, 0)
+LENGTH_CUBED: Final[FLT] = FLT(0, 3, 0)
+LENGTH_TO_THE_4TH: Final[FLT] = FLT(0, 4, 0)
+LENGTH_TO_THE_6TH: Final[FLT] = FLT(0, 6, 0)
+MOMENT: Final[FLT] = FLT(1, 1, 0)
+STRESS: Final[FLT] = FLT(1, -2, 0)
+TIME: Final[FLT] = FLT(0, 0, 1)
+UNITLESS: Final[FLT] = FLT(0, 0, 0)
+ACCELERATION: Final[FLT] = FLT(0, 1, -2)
+
+# ----- Optional: mirror onto the class for backward compatibility -----
+FLT.AREA = AREA
+FLT.DENSITY = DENSITY
+FLT.FORCE = FORCE
+FLT.FORCE_PER_LENGTH = FORCE_PER_LENGTH
+FLT.FLEXURAL_STIFFNESS = FLEXURAL_STIFFNESS
+FLT.LENGTH = LENGTH
+FLT.LENGTH_CUBED = LENGTH_CUBED
+FLT.LENGTH_TO_THE_4TH = LENGTH_TO_THE_4TH
+FLT.LENGTH_TO_THE_6TH = LENGTH_TO_THE_6TH
+FLT.MOMENT = MOMENT
+FLT.STRESS = STRESS
+FLT.TIME = TIME
+FLT.UNITLESS = UNITLESS
+FLT.ACCELERATION = ACCELERATION
+
+__all__ = [
+    # class
+    "FLT",
+    # preferred module-level singletons
+    "AREA",
+    "DENSITY",
+    "FORCE",
+    "FORCE_PER_LENGTH",
+    "FLEXURAL_STIFFNESS",
+    "LENGTH",
+    "LENGTH_CUBED",
+    "LENGTH_TO_THE_4TH",
+    "LENGTH_TO_THE_6TH",
+    "MOMENT",
+    "STRESS",
+    "TIME",
+    "UNITLESS",
+    "ACCELERATION",
+]

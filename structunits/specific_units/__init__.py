@@ -29,19 +29,30 @@ from .stress_unit import StressUnit
 from .unitless import Unitless
 from .undefined import Undefined
 
-__all__ = [
-    # Length
+from typing import Final
+kip:  Final[ForceUnit] = ForceUnit.KIP
+kips: Final[ForceUnit] = ForceUnit.KIP
+lb:   Final[ForceUnit] = ForceUnit.POUND
+kN:   Final[ForceUnit] = ForceUnit.KILONEWTON
+N:    Final[ForceUnit] = ForceUnit.NEWTON
+inch: Final[LengthUnit] = LengthUnit.INCH
+ft:   Final[LengthUnit] = LengthUnit.FOOT
+foot: Final[LengthUnit] = LengthUnit.FOOT
+mm:   Final[LengthUnit] = LengthUnit.MILLIMETER
+cm:   Final[LengthUnit] = LengthUnit.CENTIMETER
+m:    Final[LengthUnit] = LengthUnit.METER
+
+__all__: list[str] = [
     "Length", "LengthUnit",
     "LengthCubed", "LengthCubedUnit",
     "LengthToThe4th", "LengthToThe4thUnit",
-    # Force
     "Force", "ForceUnit",
     "ForcePerLength", "ForcePerLengthUnit",
-    # Moment
     "Moment", "MomentUnit",
-    # Stress
     "Stress", "StressUnit",
-    # Misc
     "Unitless", "Undefined",
+    "kip", "kips", "lb", "kN", "N",
+    "inch", "ft", "foot", "mm", "cm", "m",
 ]
+
 

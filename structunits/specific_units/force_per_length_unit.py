@@ -1,73 +1,102 @@
-from typing import ClassVar
-from structunits.unit import Unit
+from __future__ import annotations
+
+from enum import Enum
+from structunits.unit import UnitBase
 from structunits.constants import (
-    INCHES_PER_FOOT, INCHES_PER_METER,
-    MILLIMETERS_PER_METER, CENTIMETERS_PER_METER,
-    POUNDS_PER_KIP, NEWTONS_PER_KILONEWTON, KIPS_PER_KILONEWTON
+    INCHES_PER_FOOT,
+    INCHES_PER_METER,
+    MILLIMETERS_PER_METER,
+    CENTIMETERS_PER_METER,
+    POUNDS_PER_KIP,
+    NEWTONS_PER_KILONEWTON,
+    KIPS_PER_KILONEWTON,
 )
 
 
-class ForcePerLengthUnit(Unit):
-    """Unit for force per length measurements (distributed load)"""
+class ForcePerLengthUnit(UnitBase, Enum):
+    """
+    Distributed load units (force per length).
 
-    # Define class variables with type hints for autocomplete
-    POUND_PER_INCH: ClassVar['ForcePerLengthUnit']
-    POUND_PER_FOOT: ClassVar['ForcePerLengthUnit']
-    KIP_PER_INCH: ClassVar['ForcePerLengthUnit']
-    KIP_PER_FOOT: ClassVar['ForcePerLengthUnit']
-    NEWTON_PER_METER: ClassVar['ForcePerLengthUnit']
-    KILONEWTON_PER_METER: ClassVar['ForcePerLengthUnit']
-    NEWTON_PER_MILLIMETER: ClassVar['ForcePerLengthUnit']
-    KILONEWTON_PER_MILLIMETER: ClassVar['ForcePerLengthUnit']
-    NEWTON_PER_CENTIMETER: ClassVar['ForcePerLengthUnit']
-    KILONEWTON_PER_CENTIMETER: ClassVar['ForcePerLengthUnit']
+    Internal standard unit: kip per inch (k/in).
+    Each member stores a multiplier to convert FROM this unit TO kips per inch.
+    """
 
-    def __init__(self, symbol: str, name: str, conversion_factor: float):
-        """
-        Initialize a force per length unit.
+    # Instance attributes (declared for static checkers)
+    symbol: str
+    label: str
+    _to_kip_per_in: float
 
-        Args:
-            symbol: Symbol representing the unit
-            name: Full name of the unit
-            conversion_factor: Conversion factor to standard unit (kips/inch)
-        """
-        super().__init__(symbol, name)
-        self._conversion_factor = conversion_factor
+    POUND_PER_INCH = ("lb/in", "pound per inch", 1.0 / POUNDS_PER_KIP)
+    POUND_PER_FOOT = ("lb/ft", "pound per foot", 1.0 / POUNDS_PER_KIP / INCHES_PER_FOOT)
+    KIP_PER_INCH = ("k/in", "kip per inch", 1.0)
+    KIP_PER_FOOT = ("k/ft", "kip per foot", 1.0 / INCHES_PER_FOOT)
 
+    NEWTON_PER_METER = (
+        "N/m",
+        "newton per meter",
+        KIPS_PER_KILONEWTON / NEWTONS_PER_KILONEWTON / INCHES_PER_METER,
+    )
+    KILONEWTON_PER_METER = (
+        "kN/m",
+        "kilonewton per meter",
+        KIPS_PER_KILONEWTON / INCHES_PER_METER,
+    )
+
+    NEWTON_PER_MILLIMETER = (
+        "N/mm",
+        "newton per millimeter",
+        KIPS_PER_KILONEWTON / NEWTONS_PER_KILONEWTON / INCHES_PER_METER * MILLIMETERS_PER_METER,
+    )
+    KILONEWTON_PER_MILLIMETER = (
+        "kN/mm",
+        "kilonewton per millimeter",
+        KIPS_PER_KILONEWTON / INCHES_PER_METER * MILLIMETERS_PER_METER,
+    )
+
+    NEWTON_PER_CENTIMETER = (
+        "N/cm",
+        "newton per centimeter",
+        KIPS_PER_KILONEWTON / NEWTONS_PER_KILONEWTON / INCHES_PER_METER * CENTIMETERS_PER_METER,
+    )
+    KILONEWTON_PER_CENTIMETER = (
+        "kN/cm",
+        "kilonewton per centimeter",
+        KIPS_PER_KILONEWTON / INCHES_PER_METER * CENTIMETERS_PER_METER,
+    )
+
+    # Enum construction: set attributes in __new__
+    def __new__(cls, symbol: str, label: str, to_kip_per_in: float):
+        obj = object.__new__(cls)
+        obj._value_ = symbol
+        obj.symbol = symbol
+        obj.label = label  # avoid Enum's reserved .name
+        obj._to_kip_per_in = float(to_kip_per_in)
+        return obj
+
+    # Stub __init__ only to satisfy static checkers for 3-tuple values
+    def __init__(self, symbol: str, label: str, to_kip_per_in: float) -> None:
+        pass
+
+    @property
+    def conversion_to_kip_per_in(self) -> float:
+        """Multiply a value in this unit by this factor to get kips/inch."""
+        return self._to_kip_per_in
+
+    # Compatibility with code that expects Unit-like API
     def get_conversion_factor(self) -> float:
-        """
-        Get the conversion factor to the standard unit (kips/inch).
+        return self._to_kip_per_in
 
-        Returns:
-            Conversion factor to kips/inch
-        """
-        return self._conversion_factor
+    @classmethod
+    def list(cls) -> list[ForcePerLengthUnit]:
+        return list(cls)
+
+    @classmethod
+    def from_symbol(cls, s: str) -> ForcePerLengthUnit:
+        s = s.strip().lower()
+        for u in cls:
+            if u.symbol.lower() == s:
+                return u
+        raise ValueError(f"Unknown force-per-length unit symbol: {s!r}")
 
 
-# Define standard force per length units
-ForcePerLengthUnit.POUND_PER_INCH = ForcePerLengthUnit(
-    "lb/in", "pound per inch", 1.0 / POUNDS_PER_KIP)
-ForcePerLengthUnit.POUND_PER_FOOT = ForcePerLengthUnit(
-    "lb/ft", "pound per foot", 1.0 / POUNDS_PER_KIP / INCHES_PER_FOOT)
-ForcePerLengthUnit.KIP_PER_INCH = ForcePerLengthUnit(
-    "k/in", "kip per inch", 1.0)
-ForcePerLengthUnit.KIP_PER_FOOT = ForcePerLengthUnit(
-    "k/ft", "kip per foot", 1.0 / INCHES_PER_FOOT)
-ForcePerLengthUnit.NEWTON_PER_METER = ForcePerLengthUnit(
-    "N/m", "newton per meter",
-    KIPS_PER_KILONEWTON / NEWTONS_PER_KILONEWTON / INCHES_PER_METER)
-ForcePerLengthUnit.KILONEWTON_PER_METER = ForcePerLengthUnit(
-    "kN/m", "kilonewton per meter",
-    KIPS_PER_KILONEWTON / INCHES_PER_METER)
-ForcePerLengthUnit.NEWTON_PER_MILLIMETER = ForcePerLengthUnit(
-    "N/mm", "newton per millimeter",
-    KIPS_PER_KILONEWTON / NEWTONS_PER_KILONEWTON / INCHES_PER_METER * MILLIMETERS_PER_METER)
-ForcePerLengthUnit.KILONEWTON_PER_MILLIMETER = ForcePerLengthUnit(
-    "kN/mm", "kilonewton per millimeter",
-    KIPS_PER_KILONEWTON / INCHES_PER_METER * MILLIMETERS_PER_METER)
-ForcePerLengthUnit.NEWTON_PER_CENTIMETER = ForcePerLengthUnit(
-    "N/cm", "newton per centimeter",
-    KIPS_PER_KILONEWTON / NEWTONS_PER_KILONEWTON / INCHES_PER_METER * CENTIMETERS_PER_METER)
-ForcePerLengthUnit.KILONEWTON_PER_CENTIMETER = ForcePerLengthUnit(
-    "kN/cm", "kilonewton per centimeter",
-    KIPS_PER_KILONEWTON / INCHES_PER_METER * CENTIMETERS_PER_METER)
+__all__ = ["ForcePerLengthUnit"]

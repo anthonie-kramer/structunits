@@ -1,119 +1,156 @@
+from __future__ import annotations
+
+from typing import Final, Dict, overload, Literal, Self
+
 from structunits.result import Result
 from structunits.flt import FLT
-from structunits.specific_units.length_unit import LengthUnit
-from structunits.constants import INCHES_PER_FOOT, INCHES_PER_METER, MILLIMETERS_PER_METER, CENTIMETERS_PER_METER
+from .length_unit import LengthUnit as LU
+from structunits.constants import (
+    INCHES_PER_FOOT,
+    INCHES_PER_METER,
+    MILLIMETERS_PER_METER,
+    CENTIMETERS_PER_METER,
+)
 from structunits.utilities import Utilities
+from structunits.unit import UnitBase  # <-- for convert_to and widened to_latex_string
 
 
 class Length(Result):
-    """A length value with unit handling"""
+    """
+    A length value with unit handling. Standard unit: inch (in).
+    """
 
-    def __init__(self, value: float, unit: LengthUnit):
-        """
-        Construct a new length from an input value and unit.
+    _EQ_TOL: Final[float] = 1e-3  # inches
 
-        Args:
-            value: Numeric value
-            unit: Length unit
-        """
-        # Normalize to standard units (inches)
+    # in  <- from unit
+    _TO_STD: Dict[LU, float] = {
+        LU.INCH: 1.0,
+        LU.FOOT: INCHES_PER_FOOT,
+        LU.MILLIMETER: INCHES_PER_METER / MILLIMETERS_PER_METER,
+        LU.METER: INCHES_PER_METER,
+        LU.CENTIMETER: INCHES_PER_METER / CENTIMETERS_PER_METER,
+    }
+
+    # unit <- from in
+    _FROM_STD: Dict[LU, float] = {
+        LU.INCH: 1.0,
+        LU.FOOT: 1.0 / INCHES_PER_FOOT,
+        LU.MILLIMETER: MILLIMETERS_PER_METER / INCHES_PER_METER,
+        LU.METER: 1.0 / INCHES_PER_METER,
+        LU.CENTIMETER: CENTIMETERS_PER_METER / INCHES_PER_METER,
+    }
+
+        # in structunits/specific_units/length.py
+    def __init__(self, value: float, unit: LU):
         std_value = self.normalize_value(value, unit)
-        super().__init__(FLT.LENGTH, std_value, self.default_unit(), unit)
+        super().__init__(FLT.LENGTH, std_value, unit, unit)
 
-    def __repr__(self):
-        """String representation of the object."""
+
+    def __repr__(self) -> str:
         return self.to_latex_string()
 
     @property
     def equality_tolerance(self) -> float:
-        """Tolerance used when comparing two values."""
-        return 0.001
+        return self._EQ_TOL
 
     @staticmethod
-    def default_unit() -> LengthUnit:
-        """The default unit for lengths."""
-        return LengthUnit.INCH
+    def default_unit() -> LU:
+        return LU.INCH
 
     @staticmethod
-    def zero():
-        """Returns a length with a value of zero with the default units."""
-        return Length(0, LengthUnit.INCH)
+    def zero() -> "Length":
+        return Length(0.0, LU.INCH)
 
+    # ---- Convenience constructors ----
     @classmethod
-    def create_with_standard_units(cls, value: float) -> 'Length':
-        """
-        Returns a new length from the input value with the standard units.
-
-        Args:
-            value: Value in standard units (inches)
-
-        Returns:
-            A new Length instance
-        """
+    def create_with_standard_units(cls, value: float) -> Self:
         return cls(value, cls.default_unit())
 
-    def convert_to(self, target_unit: LengthUnit) -> float:
+    @classmethod
+    def from_in(cls, value: float) -> Self:
+        return cls(value, LU.INCH)
+
+    @classmethod
+    def from_ft(cls, value: float) -> Self:
+        return cls(value, LU.FOOT)
+
+    @classmethod
+    def from_mm(cls, value: float) -> Self:
+        return cls(value, LU.MILLIMETER)
+
+    @classmethod
+    def from_m(cls, value: float) -> Self:
+        return cls(value, LU.METER)
+
+    @classmethod
+    def from_cm(cls, value: float) -> Self:
+        return cls(value, LU.CENTIMETER)
+
+    # ---- Value accessors ----
+    @property
+    def inch(self) -> float:
+        return self.to_value(LU.INCH)
+
+    @property
+    def ft(self) -> float:
+        return self.to_value(LU.FOOT)
+
+    @property
+    def mm(self) -> float:
+        return self.to_value(LU.MILLIMETER)
+
+    @property
+    def m(self) -> float:
+        return self.to_value(LU.METER)
+
+    @property
+    def cm(self) -> float:
+        return self.to_value(LU.CENTIMETER)
+
+    # ---- Typed conversion API ----
+    @overload
+    def to_value(self, target_unit: Literal[LU.INCH]) -> float: ...
+    @overload
+    def to_value(self, target_unit: Literal[LU.FOOT]) -> float: ...
+    @overload
+    def to_value(self, target_unit: Literal[LU.MILLIMETER]) -> float: ...
+    @overload
+    def to_value(self, target_unit: Literal[LU.METER]) -> float: ...
+    @overload
+    def to_value(self, target_unit: Literal[LU.CENTIMETER]) -> float: ...
+    @overload
+    def to_value(self, target_unit: LU) -> float: ...
+
+    def to_value(self, target_unit: LU) -> float:
+        try:
+            return self.value * self._FROM_STD[target_unit]
+        except KeyError as e:
+            raise ValueError(f"Cannot convert to the target unit: {target_unit!r}") from e
+
+    # Fluent alias
+    in_ = to_value
+
+    # Satisfy Result's abstract method; delegate to to_value
+    def convert_to(self, target_unit: UnitBase) -> float:
+        if not isinstance(target_unit, LU):
+            raise ValueError(f"Expected LengthUnit, got {type(target_unit).__name__}")
+        return self.to_value(target_unit)
+
+    # Widen signature to match base class (UnitBase | None), then narrow before use
+    def to_latex_string(self, display_unit: UnitBase | None = None) -> str:
         """
-        Converts to the target unit.
-
-        Args:
-            target_unit: Target unit to convert to
-
-        Returns:
-            Value in the target unit
+        LaTeX string of the value in `display_unit`
+        (default: current display unit if it is a LengthUnit).
         """
-        if target_unit is None:
-            return self.value
+        du = self.display_unit if display_unit is None else display_unit
+        if not isinstance(du, LU):
+            du = self.default_unit()
+        return Utilities.to_latex_string(self.to_value(du), du)
 
-        if target_unit == LengthUnit.INCH:
-            return self.value
-        elif target_unit == LengthUnit.FOOT:
-            return self.value / INCHES_PER_FOOT
-        elif target_unit == LengthUnit.MILLIMETER:
-            return self.value / INCHES_PER_METER * MILLIMETERS_PER_METER
-        elif target_unit == LengthUnit.METER:
-            return self.value / INCHES_PER_METER
-        elif target_unit == LengthUnit.CENTIMETER:
-            return self.value / INCHES_PER_METER * CENTIMETERS_PER_METER
-
-        raise ValueError(f"Cannot convert to the target unit: {target_unit}")
-
-    def to_latex_string(self, display_unit=None) -> str:
-        """
-        Converts the unit to a LaTeX string.
-
-        Args:
-            display_unit: Unit to display
-
-        Returns:
-            LaTeX formatted string
-        """
-        if display_unit is None:
-            display_unit = self.display_unit
-
-        return Utilities.to_latex_string(self.convert_to(display_unit), display_unit)
-
+    # ---- Normalization ----
     @staticmethod
-    def normalize_value(value: float, unit: LengthUnit) -> float:
-        """
-        Normalize a value to standard units (inches).
-
-        Args:
-            value: Value in the given unit
-            unit: Unit of the value
-
-        Returns:
-            Value in standard units (inches)
-        """
-        if unit == LengthUnit.INCH:
-            return value
-        elif unit == LengthUnit.FOOT:
-            return value * INCHES_PER_FOOT
-        elif unit == LengthUnit.MILLIMETER:
-            return value / MILLIMETERS_PER_METER * INCHES_PER_METER
-        elif unit == LengthUnit.METER:
-            return value * INCHES_PER_METER
-        elif unit == LengthUnit.CENTIMETER:
-            return value / CENTIMETERS_PER_METER * INCHES_PER_METER
-
-        raise ValueError(f"Cannot convert from the source unit: {unit}")
+    def normalize_value(value: float, unit: LU) -> float:
+        try:
+            return float(value) * Length._TO_STD[unit]
+        except KeyError as e:
+            raise ValueError(f"Cannot convert from the source unit: {unit!r}") from e

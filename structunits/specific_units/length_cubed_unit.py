@@ -1,43 +1,74 @@
-from typing import ClassVar
-from structunits.unit import Unit
-from structunits.constants import INCHES_PER_FOOT, INCHES_PER_METER, MILLIMETERS_PER_METER, CENTIMETERS_PER_METER
+from __future__ import annotations
+
+from enum import Enum
+from structunits.unit import UnitBase
+from structunits.constants import (
+    INCHES_PER_FOOT,
+    INCHES_PER_METER,
+    MILLIMETERS_PER_METER,
+    CENTIMETERS_PER_METER,
+)
 
 
-class LengthCubedUnit(Unit):
-    """Unit for length cubed measurements (volume)"""
+class LengthCubedUnit(UnitBase, Enum):
+    """
+    Volume units (length^3).
 
-    # Define class variables with type hints for autocomplete
-    INCHES_CUBED: ClassVar['LengthCubedUnit']
-    FEET_CUBED: ClassVar['LengthCubedUnit']
-    MILLIMETERS_CUBED: ClassVar['LengthCubedUnit']
-    METERS_CUBED: ClassVar['LengthCubedUnit']
-    CENTIMETERS_CUBED: ClassVar['LengthCubedUnit']
+    Internal standard unit: cubic inch (in³).
+    Each member stores a multiplier to convert FROM this unit TO in³.
+    """
 
-    def __init__(self, symbol: str, name: str, conversion_factor: float):
-        """
-        Initialize a length cubed unit.
+    # Instance attributes (declared for static checkers)
+    symbol: str
+    label: str
+    _to_in3: float
 
-        Args:
-            symbol: Symbol representing the unit
-            name: Full name of the unit
-            conversion_factor: Conversion factor to standard unit (in³)
-        """
-        super().__init__(symbol, name)
-        self._conversion_factor = conversion_factor
+    INCHES_CUBED = ("in³", "cubic inch", 1.0)
+    FEET_CUBED = ("ft³", "cubic foot", INCHES_PER_FOOT ** 3)
+    MILLIMETERS_CUBED = (
+        "mm³",
+        "cubic millimeter",
+        (INCHES_PER_METER / MILLIMETERS_PER_METER) ** 3,
+    )
+    METERS_CUBED = ("m³", "cubic meter", INCHES_PER_METER ** 3)
+    CENTIMETERS_CUBED = (
+        "cm³",
+        "cubic centimeter",
+        (INCHES_PER_METER / CENTIMETERS_PER_METER) ** 3,
+    )
 
+    def __new__(cls, symbol: str, label: str, to_in3: float):
+        obj = object.__new__(cls)
+        obj._value_ = symbol
+        obj.symbol = symbol
+        obj.label = label  # avoid Enum's reserved .name
+        obj._to_in3 = float(to_in3)  # factor → in³
+        return obj
+
+    # Stub __init__ for static checkers (matches 3-tuple values)
+    def __init__(self, symbol: str, label: str, to_in3: float) -> None:
+        pass
+
+    @property
+    def conversion_to_in3(self) -> float:
+        """Multiply a value in this unit by this factor to get in³."""
+        return self._to_in3
+
+    # Compatibility method for code that expects Unit-like API
     def get_conversion_factor(self) -> float:
-        """
-        Get the conversion factor to the standard unit (in³).
+        return self._to_in3
 
-        Returns:
-            Conversion factor to in³
-        """
-        return self._conversion_factor
+    @classmethod
+    def list(cls) -> list[LengthCubedUnit]:
+        return list(cls)
+
+    @classmethod
+    def from_symbol(cls, s: str) -> LengthCubedUnit:
+        s = s.strip().lower()
+        for u in cls:
+            if u.symbol.lower() == s:
+                return u
+        raise ValueError(f"Unknown length^3 unit symbol: {s!r}")
 
 
-# Define standard length cubed units
-LengthCubedUnit.INCHES_CUBED = LengthCubedUnit("in³", "cubic inch", 1.0)
-LengthCubedUnit.FEET_CUBED = LengthCubedUnit("ft³", "cubic foot", INCHES_PER_FOOT**3)
-LengthCubedUnit.MILLIMETERS_CUBED = LengthCubedUnit("mm³", "cubic millimeter", (INCHES_PER_METER/MILLIMETERS_PER_METER)**3)
-LengthCubedUnit.METERS_CUBED = LengthCubedUnit("m³", "cubic meter", INCHES_PER_METER**3)
-LengthCubedUnit.CENTIMETERS_CUBED = LengthCubedUnit("cm³", "cubic centimeter", (INCHES_PER_METER/CENTIMETERS_PER_METER)**3)
+__all__ = ["LengthCubedUnit"]
