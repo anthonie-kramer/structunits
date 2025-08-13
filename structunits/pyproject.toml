@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling>=1.22"]
+build-backend = "hatchling.build"
+
+[project]
+name = "structunits"                          # PyPI distribution name
+version = "0.1.0"                              # Start at 0.1.0
+description = "Structural engineering unit conversion utilities for Python"
+readme = "README.md"                           # Your README file
+requires-python = ">=3.8"
+license = { text = "MIT" }                     # Or your preferred license
+authors = [
+  { name = "Anthonie Kramer", email = "anthoniekramer@gmail.com" }
+]
+keywords = ["units", "engineering", "structural", "conversion", "civil", "mechanics"]
+
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Scientific/Engineering :: Physics",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+  # Example: "pint>=0.23" if you use Pint internally for conversions
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/structunits"
+Documentation = "https://github.com/yourusername/structunits#readme"
+Issues = "https://github.com/yourusername/structunits/issues"
+Source = "https://github.com/yourusername/structunits"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/structunits"]
