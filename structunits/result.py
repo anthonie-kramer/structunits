@@ -153,6 +153,18 @@ class Result(ABC, Generic[ResultT]):
             # Non-integer exponent => unitless
             return self._build_typed_result(FLT.UNITLESS, self.value ** exponent_value)
 
+    def _repr_latex_(self) -> str:
+        r"""
+        Jupyter rich display: return a LaTeX fragment for this Result.
+        We wrap with \displaystyle so it looks like IPython.display.Math.
+        """
+        try:
+            s = self.to_latex_string(self.display_unit)
+        except Exception:
+            s = self.to_latex_string()
+        return r"$\displaystyle " + s + "$"
+
+
     # ------------------ Factories & utils ------------------
     @classmethod
     def _build_typed_result(cls, flt: FLT, value: float) -> "Result":
