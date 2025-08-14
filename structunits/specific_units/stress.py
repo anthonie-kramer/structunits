@@ -1,54 +1,42 @@
 from __future__ import annotations
 
-from typing import Final, Dict, overload, Literal, Self
+from typing import Final, Mapping, ClassVar, overload, Literal, Self, TYPE_CHECKING
+from types import MappingProxyType
 
 from structunits.result import Result
 from structunits.flt import FLT
 from structunits.specific_units.stress_unit import StressUnit as SU
-from structunits.constants import (
-    INCHES_PER_FOOT,
-    INCHES_PER_METER,
-    POUNDS_PER_KIP,
-    NEWTONS_PER_KILONEWTON,
-    KIPS_PER_KILONEWTON,
-    KILONEWTON_PER_MEGANEWTON,
-)
 from structunits.utilities import Utilities
 from structunits.unit import UnitBase
+
+if TYPE_CHECKING:
+    from structunits.specific_units.unitless import Unitless
 
 
 class Stress(Result):
     """
     A stress value with unit handling (force per area).
+    
     Standard unit: ksi (kip/in²).
+    
+    Examples
+    --------
+    >>> stress = Stress.from_psi(1000)
+    >>> stress.ksi
+    1.0
     """
 
     _EQ_TOL: Final[float] = 1e-4  # ksi
 
-    # ksi  <- from unit
-    _TO_STD: Dict[SU, float] = {
-        SU.PSI: 1.0 / POUNDS_PER_KIP,
-        SU.KSI: 1.0,
-        SU.PSF: 1.0 / POUNDS_PER_KIP / (INCHES_PER_FOOT * INCHES_PER_FOOT),
-        SU.KSF: 1.0 / (INCHES_PER_FOOT * INCHES_PER_FOOT),
-        SU.KPA: 1.0 / (INCHES_PER_METER * INCHES_PER_METER) * KIPS_PER_KILONEWTON,
-        SU.MPA: 1.0 / (INCHES_PER_METER * INCHES_PER_METER) * KIPS_PER_KILONEWTON * KILONEWTON_PER_MEGANEWTON,
-        SU.PA:  1.0 / (INCHES_PER_METER * INCHES_PER_METER) * KIPS_PER_KILONEWTON * NEWTONS_PER_KILONEWTON,
-    }
+    # Conversion maps derived from unit enum for consistency
+    _TO_STD: ClassVar[Mapping[SU, float]] = MappingProxyType({
+        u: u.get_conversion_factor() for u in SU
+    })
+    _FROM_STD: ClassVar[Mapping[SU, float]] = MappingProxyType({
+        u: 1.0 / u.get_conversion_factor() for u in SU
+    })
 
-    # unit <- from ksi
-    _FROM_STD: Dict[SU, float] = {
-        SU.PSI: POUNDS_PER_KIP,
-        SU.KSI: 1.0,
-        SU.PSF: POUNDS_PER_KIP * (INCHES_PER_FOOT * INCHES_PER_FOOT),
-        SU.KSF: (INCHES_PER_FOOT * INCHES_PER_FOOT),
-        SU.KPA: (INCHES_PER_METER * INCHES_PER_METER) / KIPS_PER_KILONEWTON,
-        SU.MPA: (INCHES_PER_METER * INCHES_PER_METER) / (KIPS_PER_KILONEWTON * KILONEWTON_PER_MEGANEWTON),
-        SU.PA:  (INCHES_PER_METER * INCHES_PER_METER) / KIPS_PER_KILONEWTON * NEWTONS_PER_KILONEWTON,
-    }
-
-    # in structunits/specific_units/stress.py
-    def __init__(self, value: float, unit: SU):
+    def __init__(self, value: float, unit: SU) -> None:
         std_value = self.normalize_value(value, unit)
         super().__init__(FLT.STRESS, std_value, unit, unit)
 
@@ -66,6 +54,7 @@ class Stress(Result):
 
     @staticmethod
     def zero() -> "Stress":
+        """Create a zero stress value."""
         return Stress(0.0, SU.KSI)
 
     # ---- Convenience constructors ----
@@ -144,13 +133,29 @@ class Stress(Result):
             du = self.default_unit()
         return Utilities.to_latex_string(self.to_value(du), du)
 
-    # ---- Normalization ----
     @staticmethod
     def normalize_value(value: float, unit: SU) -> float:
         try:
             return float(value) * Stress._TO_STD[unit]
         except KeyError as e:
             raise ValueError(f"Cannot convert from the source unit: {unit!r}") from e
+
+    # --- Division operators ---
+    @overload
+    def __truediv__(self, other: SU) -> "Unitless": ...
+    @overload
+    def __truediv__(self, other: "Result | float | int") -> "Result": ...
+
+    def __truediv__(self, other: object) -> "Result":  # type: ignore[override]
+        if isinstance(other, SU):
+            # Stress / StressUnit -> Unitless ratio
+            from structunits.specific_units.unitless import Unitless
+            
+            # Get this stress's value in the target unit
+            value_in_unit = self.to_value(other)
+            return Unitless(value_in_unit)
+
+        return super().__truediv__(other)  # type: ignore[misc]
 
 
 __all__ = ["Stress"]

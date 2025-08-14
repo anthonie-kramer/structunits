@@ -1,61 +1,45 @@
 from __future__ import annotations
 
-from typing import Final, Dict, overload, Literal, Self
+from typing import Final, Mapping, ClassVar, overload, Literal, Self, TYPE_CHECKING
+from types import MappingProxyType
 
 from structunits.result import Result
 from structunits.flt import FLT
 from structunits.specific_units.moment_unit import MomentUnit as MU
-from structunits.constants import (
-    INCHES_PER_FOOT,
-    INCHES_PER_METER,
-    MILLIMETERS_PER_METER,
-    CENTIMETERS_PER_METER,
-    POUNDS_PER_KIP,
-    NEWTONS_PER_KILONEWTON,
-    KIPS_PER_KILONEWTON,
-)
 from structunits.utilities import Utilities
 from structunits.unit import UnitBase
+
+if TYPE_CHECKING:
+    from .length_unit import LengthUnit
+    from .force_unit import ForceUnit
+    from .force import Force
+    from .length import Length
 
 
 class Moment(Result):
     """
     A moment value with unit handling (force × distance).
+    
     Standard unit: kip·inch (kip-in).
+    
+    Examples
+    --------
+    >>> moment = Moment.from_lb_ft(1000)
+    >>> moment.k_in
+    83.333...
     """
 
     _EQ_TOL: Final[float] = 1e-2  # kip-in
 
-    # kip-in  <- from unit
-    _TO_STD: Dict[MU, float] = {
-        MU.POUND_INCH: 1.0 / POUNDS_PER_KIP,
-        MU.POUND_FOOT: (1.0 / POUNDS_PER_KIP) * INCHES_PER_FOOT,
-        MU.KIP_INCH: 1.0,
-        MU.KIP_FOOT: INCHES_PER_FOOT,
-        MU.NEWTON_METER: KIPS_PER_KILONEWTON / NEWTONS_PER_KILONEWTON * INCHES_PER_METER,
-        MU.KILONEWTON_METER: KIPS_PER_KILONEWTON * INCHES_PER_METER,
-        MU.KILONEWTON_MILLIMETER: KIPS_PER_KILONEWTON * INCHES_PER_METER / MILLIMETERS_PER_METER,
-        MU.NEWTON_MILLIMETER: KIPS_PER_KILONEWTON / NEWTONS_PER_KILONEWTON * INCHES_PER_METER / MILLIMETERS_PER_METER,
-        MU.KILONEWTON_CENTIMETER: KIPS_PER_KILONEWTON * INCHES_PER_METER / CENTIMETERS_PER_METER,
-        MU.NEWTON_CENTIMETER: KIPS_PER_KILONEWTON / NEWTONS_PER_KILONEWTON * INCHES_PER_METER / CENTIMETERS_PER_METER,
-    }
+    # Conversion maps derived from unit enum for consistency
+    _TO_STD: ClassVar[Mapping[MU, float]] = MappingProxyType({
+        u: u.get_conversion_factor() for u in MU
+    })
+    _FROM_STD: ClassVar[Mapping[MU, float]] = MappingProxyType({
+        u: 1.0 / u.get_conversion_factor() for u in MU
+    })
 
-    # unit <- from kip-in
-    _FROM_STD: Dict[MU, float] = {
-        MU.POUND_INCH: POUNDS_PER_KIP,
-        MU.POUND_FOOT: POUNDS_PER_KIP / INCHES_PER_FOOT,
-        MU.KIP_INCH: 1.0,
-        MU.KIP_FOOT: 1.0 / INCHES_PER_FOOT,
-        MU.NEWTON_METER: NEWTONS_PER_KILONEWTON / KIPS_PER_KILONEWTON / INCHES_PER_METER,
-        MU.KILONEWTON_METER: 1.0 / KIPS_PER_KILONEWTON / INCHES_PER_METER,
-        MU.KILONEWTON_MILLIMETER: 1.0 / KIPS_PER_KILONEWTON * (MILLIMETERS_PER_METER / INCHES_PER_METER),
-        MU.NEWTON_MILLIMETER: NEWTONS_PER_KILONEWTON / KIPS_PER_KILONEWTON * (MILLIMETERS_PER_METER / INCHES_PER_METER),
-        MU.KILONEWTON_CENTIMETER: 1.0 / KIPS_PER_KILONEWTON * (CENTIMETERS_PER_METER / INCHES_PER_METER),
-        MU.NEWTON_CENTIMETER: NEWTONS_PER_KILONEWTON / KIPS_PER_KILONEWTON * (CENTIMETERS_PER_METER / INCHES_PER_METER),
-    }
-
-    # in structunits/specific_units/moment.py
-    def __init__(self, value: float, unit: MU):
+    def __init__(self, value: float, unit: MU) -> None:
         std_value = self.normalize_value(value, unit)
         super().__init__(FLT.MOMENT, std_value, unit, unit)
 
@@ -73,6 +57,7 @@ class Moment(Result):
 
     @staticmethod
     def zero() -> "Moment":
+        """Create a zero moment value."""
         return Moment(0.0, MU.KIP_INCH)
 
     # ---- Convenience constructors ----
@@ -206,6 +191,62 @@ class Moment(Result):
         if not isinstance(du, MU):
             du = self.default_unit()
         return Utilities.to_latex_string(self.to_value(du), du)
+
+    # --- Division operators for unit decomposition ---
+    @overload
+    def __truediv__(self, other: "LengthUnit") -> "Force": ...
+    @overload
+    def __truediv__(self, other: "ForceUnit") -> "Length": ...
+    @overload
+    def __truediv__(self, other: "Result | float | int") -> "Result": ...
+
+    def __truediv__(self, other: object) -> "Result":  # type: ignore[override]
+        from .length_unit import LengthUnit as LU
+        from .force_unit import ForceUnit as FU
+        
+        if isinstance(other, LU):
+            # Moment / LengthUnit -> Force
+            from .force import Force
+            from .moment_unit import MomentUnit as MU
+            
+            # Get the moment unit and decompose it
+            moment_display_unit = self.display_unit
+            moment_unit = moment_display_unit if isinstance(moment_display_unit, MU) else MU.KIP_INCH
+            
+            # Use the MomentUnit division to get the corresponding ForceUnit
+            decomposed_unit = moment_unit / other  # Returns LengthUnit | ForceUnit
+            
+            # Type narrow: we know that MomentUnit / LengthUnit -> ForceUnit
+            if not isinstance(decomposed_unit, FU):
+                raise TypeError(f"Expected ForceUnit from moment/length division, got {type(decomposed_unit)}")
+            force_unit = decomposed_unit
+            
+            # Get moment value in the moment unit, then create force
+            moment_value = self.to_value(moment_unit)
+            return Force(moment_value, force_unit)
+            
+        elif isinstance(other, FU):
+            # Moment / ForceUnit -> Length
+            from .length import Length
+            from .moment_unit import MomentUnit as MU
+            
+            # Get the moment unit and decompose it
+            moment_display_unit = self.display_unit
+            moment_unit = moment_display_unit if isinstance(moment_display_unit, MU) else MU.KIP_INCH
+            
+            # Use the MomentUnit division to get the corresponding LengthUnit
+            decomposed_unit = moment_unit / other  # Returns LengthUnit | ForceUnit
+            
+            # Type narrow: we know that MomentUnit / ForceUnit -> LengthUnit
+            if not isinstance(decomposed_unit, LU):
+                raise TypeError(f"Expected LengthUnit from moment/force division, got {type(decomposed_unit)}")
+            length_unit = decomposed_unit
+            
+            # Get moment value in the moment unit, then create length
+            moment_value = self.to_value(moment_unit)
+            return Length(moment_value, length_unit)
+
+        return super().__truediv__(other)  # type: ignore[misc]
 
     # ---- Normalization ----
     @staticmethod

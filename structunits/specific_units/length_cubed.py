@@ -1,50 +1,44 @@
 from __future__ import annotations
 
-from typing import Final, Dict, overload, Literal, Self
+from typing import Final, Mapping, ClassVar, overload, Literal, Self, TYPE_CHECKING
+from types import MappingProxyType
 
 from structunits.result import Result
 from structunits.flt import FLT
 from structunits.specific_units.length_cubed_unit import LengthCubedUnit as LCU
-from structunits.constants import (
-    INCHES_PER_FOOT,
-    INCHES_PER_METER,
-    MILLIMETERS_PER_METER,
-    CENTIMETERS_PER_METER,
-)
 from structunits.unit import UnitBase
 from structunits.utilities import Utilities
+
+if TYPE_CHECKING:
+    from structunits.specific_units.unitless import Unitless
 
 
 class LengthCubed(Result):
     """
-    A length-cubed (volume) value. Standard unit: in³.
+    A length-cubed (volume) value with unit handling.
+    
+    Standard unit: cubic inch (in³).
+    
+    Examples
+    --------
+    >>> volume = LengthCubed.from_ft3(1.0)
+    >>> volume.in3
+    1728.0
     """
 
     _EQ_TOL: Final[float] = 1e-3  # in³
 
-    # in³  <- from unit
-    _TO_STD: Dict[LCU, float] = {
-        LCU.INCHES_CUBED: 1.0,
-        LCU.FEET_CUBED: INCHES_PER_FOOT ** 3,
-        LCU.MILLIMETERS_CUBED: (INCHES_PER_METER / MILLIMETERS_PER_METER) ** 3,
-        LCU.METERS_CUBED: INCHES_PER_METER ** 3,
-        LCU.CENTIMETERS_CUBED: (INCHES_PER_METER / CENTIMETERS_PER_METER) ** 3,
-    }
+    # Conversion maps derived from unit enum for consistency
+    _TO_STD: ClassVar[Mapping[LCU, float]] = MappingProxyType({
+        u: u.get_conversion_factor() for u in LCU
+    })
+    _FROM_STD: ClassVar[Mapping[LCU, float]] = MappingProxyType({
+        u: 1.0 / u.get_conversion_factor() for u in LCU
+    })
 
-    # unit <- from in³
-    _FROM_STD: Dict[LCU, float] = {
-        LCU.INCHES_CUBED: 1.0,
-        LCU.FEET_CUBED: 1.0 / (INCHES_PER_FOOT ** 3),
-        LCU.MILLIMETERS_CUBED: (MILLIMETERS_PER_METER ** 3) / (INCHES_PER_METER ** 3),
-        LCU.METERS_CUBED: 1.0 / (INCHES_PER_METER ** 3),
-        LCU.CENTIMETERS_CUBED: (CENTIMETERS_PER_METER ** 3) / (INCHES_PER_METER ** 3),
-    }
-
-    # in structunits/specific_units/length_cubed.py
-    def __init__(self, value: float, unit: LCU):
+    def __init__(self, value: float, unit: LCU) -> None:
         std_value = self.normalize_value(value, unit)
         super().__init__(FLT.LENGTH_CUBED, std_value, unit, unit)
-
 
     def __repr__(self) -> str:
         return self.to_latex_string()
@@ -56,6 +50,11 @@ class LengthCubed(Result):
     @staticmethod
     def default_unit() -> LCU:
         return LCU.INCHES_CUBED
+
+    @staticmethod
+    def zero() -> "LengthCubed":
+        """Create a zero volume value."""
+        return LengthCubed(0.0, LCU.INCHES_CUBED)
 
     # ---- Convenience constructors ----
     @classmethod
@@ -127,22 +126,17 @@ class LengthCubed(Result):
     in_ = to_value
 
     def convert_to(self, target_unit: UnitBase) -> float:
-        from structunits.specific_units.length_cubed_unit import LengthCubedUnit as LCU
         if not isinstance(target_unit, LCU):
             raise ValueError(f"Expected LengthCubedUnit, got {type(target_unit).__name__}")
         return self.to_value(target_unit)
 
-
     def to_latex_string(self, display_unit: LCU | None = None) -> str:
-        """
-        LaTeX string of the value in `display_unit` (default: current display unit if it's LCU).
-        """
+        """LaTeX string of the value in display_unit."""
         if display_unit is None:
             du = self.display_unit
             display_unit = du if isinstance(du, LCU) else self.default_unit()
         return Utilities.to_latex_string(self.to_value(display_unit), display_unit)
 
-    # ---- Normalization ----
     @staticmethod
     def normalize_value(value: float, unit: LCU) -> float:
         try:
@@ -150,5 +144,21 @@ class LengthCubed(Result):
         except KeyError as e:
             raise ValueError(f"Cannot convert from the source unit: {unit!r}") from e
 
+    # --- Division operators ---
+    @overload
+    def __truediv__(self, other: LCU) -> "Unitless": ...
+    @overload
+    def __truediv__(self, other: "Result | float | int") -> "Result": ...
+
+    def __truediv__(self, other: object) -> "Result":  # type: ignore[override]
+        if isinstance(other, LCU):
+            # LengthCubed / LengthCubedUnit -> Unitless ratio
+            from structunits.specific_units.unitless import Unitless
+            
+            # Get this volume's value in the target unit
+            value_in_unit = self.to_value(other)
+            return Unitless(value_in_unit)
+
+        return super().__truediv__(other)  # type: ignore[misc]
 
 __all__ = ["LengthCubed"]

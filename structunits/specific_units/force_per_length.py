@@ -1,60 +1,42 @@
 from __future__ import annotations
 
-from typing import Final, Dict, overload, Literal, Self
+from typing import Final, Mapping, ClassVar, overload, Literal, Self, TYPE_CHECKING
+from types import MappingProxyType
 
 from structunits.result import Result
 from structunits.flt import FLT
 from structunits.unit import UnitBase
 from structunits.specific_units.force_per_length_unit import ForcePerLengthUnit as FPLU
-from structunits.constants import (
-    INCHES_PER_FOOT,
-    INCHES_PER_METER,
-    MILLIMETERS_PER_METER,
-    CENTIMETERS_PER_METER,
-    POUNDS_PER_KIP,
-    NEWTONS_PER_KILONEWTON,
-    KIPS_PER_KILONEWTON,
-)
 from structunits.utilities import Utilities
+
+if TYPE_CHECKING:
+    from structunits.specific_units.unitless import Unitless
 
 
 class ForcePerLength(Result):
     """
-    A distributed load (force per length). Standard unit: kip per inch (k/in).
+    A distributed load with unit handling (force per length).
+    
+    Standard unit: kip per inch (k/in).
+    
+    Examples
+    --------
+    >>> load = ForcePerLength.from_lb_per_ft(100)
+    >>> load.kip_per_in
+    0.00694...
     """
 
     _EQ_TOL: Final[float] = 1e-4  # kips/inch
 
-    # kip/in  <- from unit
-    _TO_STD: Dict[FPLU, float] = {
-        FPLU.POUND_PER_INCH: 1.0 / POUNDS_PER_KIP,
-        FPLU.POUND_PER_FOOT: 1.0 / POUNDS_PER_KIP / INCHES_PER_FOOT,
-        FPLU.KIP_PER_INCH: 1.0,
-        FPLU.KIP_PER_FOOT: 1.0 / INCHES_PER_FOOT,
-        FPLU.NEWTON_PER_METER: KIPS_PER_KILONEWTON / NEWTONS_PER_KILONEWTON / INCHES_PER_METER,
-        FPLU.KILONEWTON_PER_METER: KIPS_PER_KILONEWTON / INCHES_PER_METER,
-        FPLU.NEWTON_PER_MILLIMETER: KIPS_PER_KILONEWTON / NEWTONS_PER_KILONEWTON / INCHES_PER_METER * MILLIMETERS_PER_METER,
-        FPLU.KILONEWTON_PER_MILLIMETER: KIPS_PER_KILONEWTON / INCHES_PER_METER * MILLIMETERS_PER_METER,
-        FPLU.NEWTON_PER_CENTIMETER: KIPS_PER_KILONEWTON / NEWTONS_PER_KILONEWTON / INCHES_PER_METER * CENTIMETERS_PER_METER,
-        FPLU.KILONEWTON_PER_CENTIMETER: KIPS_PER_KILONEWTON / INCHES_PER_METER * CENTIMETERS_PER_METER,
-    }
+    # Conversion maps derived from unit enum for consistency
+    _TO_STD: ClassVar[Mapping[FPLU, float]] = MappingProxyType({
+        u: u.get_conversion_factor() for u in FPLU
+    })
+    _FROM_STD: ClassVar[Mapping[FPLU, float]] = MappingProxyType({
+        u: 1.0 / u.get_conversion_factor() for u in FPLU
+    })
 
-    # unit  <- from kip/in
-    _FROM_STD: Dict[FPLU, float] = {
-        FPLU.POUND_PER_INCH: POUNDS_PER_KIP,
-        FPLU.POUND_PER_FOOT: POUNDS_PER_KIP * INCHES_PER_FOOT,
-        FPLU.KIP_PER_INCH: 1.0,
-        FPLU.KIP_PER_FOOT: INCHES_PER_FOOT,
-        FPLU.NEWTON_PER_METER: NEWTONS_PER_KILONEWTON / KIPS_PER_KILONEWTON * INCHES_PER_METER,
-        FPLU.KILONEWTON_PER_METER: 1.0 / KIPS_PER_KILONEWTON * INCHES_PER_METER,
-        FPLU.NEWTON_PER_MILLIMETER: NEWTONS_PER_KILONEWTON / KIPS_PER_KILONEWTON * INCHES_PER_METER / MILLIMETERS_PER_METER,
-        FPLU.KILONEWTON_PER_MILLIMETER: 1.0 / KIPS_PER_KILONEWTON * INCHES_PER_METER / MILLIMETERS_PER_METER,
-        FPLU.NEWTON_PER_CENTIMETER: NEWTONS_PER_KILONEWTON / KIPS_PER_KILONEWTON * INCHES_PER_METER / CENTIMETERS_PER_METER,
-        FPLU.KILONEWTON_PER_CENTIMETER: 1.0 / KIPS_PER_KILONEWTON * INCHES_PER_METER / CENTIMETERS_PER_METER,
-    }
-
-    # in structunits/specific_units/force_per_length.py
-    def __init__(self, value: float, unit: FPLU):
+    def __init__(self, value: float, unit: FPLU) -> None:
         std_value = self.normalize_value(value, unit)
         super().__init__(FLT.FORCE_PER_LENGTH, std_value, unit, unit)
 
@@ -69,6 +51,11 @@ class ForcePerLength(Result):
     @staticmethod
     def default_unit() -> FPLU:
         return FPLU.KIP_PER_INCH
+
+    @staticmethod
+    def zero() -> "ForcePerLength":
+        """Create a zero distributed load value."""
+        return ForcePerLength(0.0, FPLU.KIP_PER_INCH)
 
     # ---- Convenience constructors ----
     @classmethod
@@ -195,15 +182,12 @@ class ForcePerLength(Result):
         return self.to_value(target_unit)
 
     def to_latex_string(self, display_unit: FPLU | None = None) -> str:
-        """
-        LaTeX string of the value in `display_unit` (default: self.display_unit if it is an FPLU).
-        """
+        """LaTeX string of the value in display_unit."""
         if display_unit is None:
             du = self.display_unit
             display_unit = du if isinstance(du, FPLU) else self.default_unit()
         return Utilities.to_latex_string(self.to_value(display_unit), display_unit)
 
-    # ---- Normalization ----
     @staticmethod
     def normalize_value(value: float, unit: FPLU) -> float:
         try:
@@ -211,5 +195,21 @@ class ForcePerLength(Result):
         except KeyError as e:
             raise ValueError(f"Cannot convert from the source unit: {unit!r}") from e
 
+    # --- Division operators ---
+    @overload
+    def __truediv__(self, other: FPLU) -> "Unitless": ...
+    @overload
+    def __truediv__(self, other: "Result | float | int") -> "Result": ...
+
+    def __truediv__(self, other: object) -> "Result":  # type: ignore[override]
+        if isinstance(other, FPLU):
+            # ForcePerLength / ForcePerLengthUnit -> Unitless ratio
+            from structunits.specific_units.unitless import Unitless
+            
+            # Get this distributed load's value in the target unit
+            value_in_unit = self.to_value(other)
+            return Unitless(value_in_unit)
+
+        return super().__truediv__(other)  # type: ignore[misc]
 
 __all__ = ["ForcePerLength"]
