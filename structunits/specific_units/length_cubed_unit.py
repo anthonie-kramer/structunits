@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import TYPE_CHECKING, Final
+
 from structunits.unit import UnitBase
 from structunits.constants import (
     INCHES_PER_FOOT,
@@ -9,20 +11,32 @@ from structunits.constants import (
     CENTIMETERS_PER_METER,
 )
 
+if TYPE_CHECKING:
+    from .length_cubed import LengthCubed
+
 
 class LengthCubedUnit(UnitBase, Enum):
     """
-    Volume units (length^3).
+    Units for volume (length^3) quantities.
 
-    Internal standard unit: cubic inch (in³).
-    Each member stores a multiplier to convert FROM this unit TO in³.
+    The internal standard unit is cubic inch (in³).
+    Each member stores a conversion factor to convert FROM this unit TO in³.
+
+    Examples
+    --------
+    >>> unit = LengthCubedUnit.FEET_CUBED
+    >>> unit.symbol
+    'ft³'
+    >>> unit.get_conversion_factor()
+    1728.0
     """
 
-    # Instance attributes (declared for static checkers)
+    # Instance attributes for static type checkers
     symbol: str
     label: str
-    _to_in3: float
+    _conversion_factor: float
 
+    # Unit definitions: (symbol, label, factor_to_standard_unit)
     INCHES_CUBED = ("in³", "cubic inch", 1.0)
     FEET_CUBED = ("ft³", "cubic foot", INCHES_PER_FOOT ** 3)
     MILLIMETERS_CUBED = (
@@ -37,38 +51,84 @@ class LengthCubedUnit(UnitBase, Enum):
         (INCHES_PER_METER / CENTIMETERS_PER_METER) ** 3,
     )
 
-    def __new__(cls, symbol: str, label: str, to_in3: float):
+    def __new__(cls, symbol: str, label: str, conversion_factor: float) -> "LengthCubedUnit":
         obj = object.__new__(cls)
         obj._value_ = symbol
         obj.symbol = symbol
-        obj.label = label  # avoid Enum's reserved .name
-        obj._to_in3 = float(to_in3)  # factor → in³
+        obj.label = label
+        obj._conversion_factor = float(conversion_factor)
         return obj
 
-    # Stub __init__ for static checkers (matches 3-tuple values)
-    def __init__(self, symbol: str, label: str, to_in3: float) -> None:
+    def __init__(self, symbol: str, label: str, conversion_factor: float) -> None:
+        """Initialize unit (stub for type checker compatibility)."""
         pass
 
-    @property
-    def conversion_to_in3(self) -> float:
-        """Multiply a value in this unit by this factor to get in³."""
-        return self._to_in3
+    def __repr__(self) -> str:
+        return f"LengthCubedUnit.{self.name}({self.symbol!r})"
 
-    # Compatibility method for code that expects Unit-like API
+    # --- Scalar arithmetic for LengthCubed creation ---
+    def __rmul__(self, other: float | int) -> "LengthCubed":
+        """Enable: scalar * LengthCubedUnit -> LengthCubed."""
+        if not isinstance(other, (int, float)):
+            return NotImplemented
+        from .length_cubed import LengthCubed
+        return LengthCubed(float(other), self)
+
+    def __mul__(self, other: float | int) -> "LengthCubed":
+        """Enable: LengthCubedUnit * scalar -> LengthCubed."""
+        return self.__rmul__(other)
+
+    def __call__(self, value: float | int) -> "LengthCubed":
+        """Enable: LengthCubedUnit(scalar) -> LengthCubed."""
+        from .length_cubed import LengthCubed
+        return LengthCubed(float(value), self)
+
     def get_conversion_factor(self) -> float:
-        return self._to_in3
+        """Get the conversion factor to the standard unit (in³)."""
+        return self._conversion_factor
+
+    @property
+    def conversion_factor(self) -> float:
+        """Conversion factor to standard unit (in³)."""
+        return self._conversion_factor
 
     @classmethod
-    def list(cls) -> list[LengthCubedUnit]:
+    def get_standard_unit(cls) -> "LengthCubedUnit":
+        """Get the standard unit for this unit type."""
+        return cls.INCHES_CUBED
+
+    @classmethod
+    def list_all(cls) -> list["LengthCubedUnit"]:
+        """Get all available units in this enum."""
         return list(cls)
 
     @classmethod
-    def from_symbol(cls, s: str) -> LengthCubedUnit:
-        s = s.strip().lower()
-        for u in cls:
-            if u.symbol.lower() == s:
-                return u
-        raise ValueError(f"Unknown length^3 unit symbol: {s!r}")
+    def from_symbol(cls, symbol: str) -> "LengthCubedUnit":
+        """
+        Find unit by symbol (case-insensitive).
+
+        Args:
+            symbol: The unit symbol to search for
+
+        Returns:
+            The matching LengthCubedUnit
+
+        Raises:
+            ValueError: If the symbol is not found
+        """
+        normalized_symbol = symbol.strip().lower()
+        for unit in cls:
+            if unit.symbol.lower() == normalized_symbol:
+                return unit
+
+        available_symbols = [u.symbol for u in cls]
+        raise ValueError(
+            f"Unknown length³ unit symbol: {symbol!r}. "
+            f"Available symbols: {available_symbols}"
+        )
+
+    # Legacy compatibility
+    list = list_all
 
 
 __all__ = ["LengthCubedUnit"]

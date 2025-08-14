@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Self
+from typing import Self, Final
 
 from structunits.result import Result
 from structunits.flt import FLT
@@ -8,13 +8,25 @@ from structunits.unit import UnitBase
 
 
 # Sentinel unit so we don't pass None to Result.__init__
-_UNDEFINED_UNIT = UnitBase("-", "undefined")
+_UNDEFINED_UNIT: Final[UnitBase] = UnitBase("-", "undefined")
 
 
 class Undefined(Result):
-    """Undefined unit type, used for custom FLT combinations."""
+    """
+    Undefined unit type for custom FLT combinations.
+    
+    This class handles results from operations that don't map to
+    specific unit types, allowing the system to remain flexible
+    for arbitrary unit combinations.
+    
+    Examples
+    --------
+    >>> undefined = Undefined(FLT.UNITLESS, 42.0)
+    >>> undefined.value
+    42.0
+    """
 
-    def __init__(self, flt: FLT, value: float):
+    def __init__(self, flt: FLT, value: float) -> None:
         # display_unit / input_unit use a harmless sentinel
         super().__init__(flt, float(value), _UNDEFINED_UNIT, _UNDEFINED_UNIT)
 
@@ -24,6 +36,11 @@ class Undefined(Result):
     @property
     def equality_tolerance(self) -> float:
         return 1e-10
+
+    @staticmethod
+    def zero(flt: FLT = FLT.UNITLESS) -> "Undefined":
+        """Create a zero undefined value with the specified FLT."""
+        return Undefined(flt, 0.0)
 
     def to_latex_string(self, display_unit: UnitBase | None = None) -> str:
         # Plain textual form; we don't have a real unit symbol here

@@ -178,6 +178,9 @@ class Result(ABC, Generic[ResultT]):
         if unit_type == UnitType.LENGTH:
             from structunits.specific_units.length import Length
             return Length.create_with_standard_units(value)
+        if unit_type == UnitType.AREA:
+            from structunits.specific_units.area import Area
+            return Area.create_with_standard_units(value)
         if unit_type == UnitType.FORCE:
             from structunits.specific_units.force import Force
             return Force.create_with_standard_units(value)

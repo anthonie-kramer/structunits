@@ -22,6 +22,7 @@ import importlib
 _FORWARD = [
     # Length and length-derived
     "Length", "LengthUnit",
+    "Area", "AreaUnit",
     "LengthCubed", "LengthCubedUnit",
     "LengthToThe4th", "LengthToThe4thUnit",
     # Force and related
